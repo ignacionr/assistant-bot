@@ -33,11 +33,15 @@ jobs:
         echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
 
+        # Kill existing instance on the server
+        ssh -o StrictHostKeyChecking=no root@bot.fastmicroservices.com << 'EOF'
+          pkill -f bot
+        EOF
+
         # Copy binary to the server
         scp -o StrictHostKeyChecking=no build/MyBotApp root@bot.fastmicroservices.com:/root/bot
 
-        # Kill existing instance and run new one
+        # Run new instance
         ssh -o StrictHostKeyChecking=no root@bot.fastmicroservices.com << 'EOF'
-          pkill -f bot
           nohup /root/bot > /dev/null 2>&1 &
         EOF
