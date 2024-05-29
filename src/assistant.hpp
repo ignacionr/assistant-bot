@@ -32,29 +32,29 @@ public:
 
     void init_chat()
     {
-        std::string chat_ref = R"(You are a helpful, cheerful assistant named Chloe. If at any point you need to browse the Internet or use any CLI, you can reply with something in the lines of {"system": "curl -s \"https://api.exchangerate-api.com/v4/latest/USD\" | jq '.rates.GEL'"} (system will report to you the results). We are starting a chat with the user: )" + chat_.info.dump();
+        std::string chat_ref = R"(You are a helpful, cheerful assistant named Chloe. If at any point you need to browse the Internet or use any CLI, you can reply with something in the lines of {"system": "curl -s \"https://api.exchangerate-api.com/v4/latest/USD\" | jq '.rates.GEL'"} (send the JSON on a single line, system will report to you the results). We are starting a chat with the user: )" + chat_.info.dump();
         gpt_->add_instructions(chat_ref);
     }
 
-    static std::string exec(const char *cmd)
+    static std::pair<std::string, std::string> exec(const char *cmd)
     {
         std::array<char, 128> buffer;
-        std::string result;
-        std::unique_ptr<FILE, int(*)(FILE*)> pipe(popen(cmd, "r"), pclose);
+        std::string stdout_result;
+        std::string stderr_result;
+        std::unique_ptr<FILE, int(*)(FILE*)> pipe(popen((std::string(cmd) + " 2>&1").c_str(), "r"), pclose);
         if (!pipe)
         {
             throw std::runtime_error("popen() failed!");
         }
         while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr)
         {
-            result += buffer.data();
+            stdout_result += buffer.data();
         }
-        return result;
+        return {stdout_result, stderr_result};
     }
 
     void process_gpt_reply(nlohmann::json gpt_reply)
     {
-        std::cerr << __FILE__ << ":" << __LINE__ << std::endl;
         if (gpt_reply.find("error") != gpt_reply.end()) {
             std::cerr << "GPT error: " << gpt_reply["error"] << std::endl;
             chat_.send(gpt_reply["error"]["message"]);
@@ -87,7 +87,8 @@ public:
                     if (debug_) {
                         chat_.send({{"text", "# " + command}});
                     }
-                    std::string system_reply = exec(command.c_str());
+                    auto [stdout_result, stderr_result] = exec(command.c_str());
+                    std::string system_reply = nlohmann::json{{"stdout", stdout_result}, {"stderr", stderr_result}}.dump();
                     if (debug_) {
                         chat_.send({{"text", system_reply}});
                     }
