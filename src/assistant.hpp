@@ -41,7 +41,21 @@ public:
             init_chat();
             return;
         }
-        auto gpt_reply = gpt_->sendMessage(text, "user");
+        else if (text == "/model") {
+            chat_.send("I'm currently using the " + model_name_ + " model.");
+            return;
+        }
+        else if (text.find("/model ") == 0) {
+            std::string new_model = text.substr(7);
+            if (new_model == "gpt-3.5-turbo" || new_model == "gpt-4.0-turbo") {
+                model_name_ = new_model;
+                chat_.send("I'm now using the " + model_name_ + " model.");
+            } else {
+                chat_.send("I'm sorry, I don't recognize that model. I'm currently using the " + model_name_ + " model.");
+            }
+            return;
+        }
+        auto gpt_reply = gpt_->sendMessage(text, "user", model_name_);
         std::string text_reply;
         try
         {
@@ -85,4 +99,5 @@ public:
 private:
     chat_t &chat_;
     std::unique_ptr<ignacionr::cppgpt> gpt_;
+    std::string model_name_ = "gpt-3.5-turbo";
 };
