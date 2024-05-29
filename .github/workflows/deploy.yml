@@ -34,10 +34,10 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
 
         # Copy binary to the server
-        scp -o StrictHostKeyChecking=no build/MyBotApp user@yourserver:/root/bot
+        scp -o StrictHostKeyChecking=no build/MyBotApp root@bot.fastmicroservices.com:/root/bot
 
         # Kill existing instance and run new one
-        ssh -o StrictHostKeyChecking=no user@yourserver << 'EOF'
+        ssh -o StrictHostKeyChecking=no root@bot.fastmicroservices.com << 'EOF'
           pkill -f bot
           nohup /root/bot > /dev/null 2>&1 &
         EOF
