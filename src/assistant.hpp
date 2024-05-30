@@ -36,7 +36,34 @@ public:
 
     void init_chat()
     {
-        std::string chat_ref = R"(You are a helpful, expedite, cheerful assistant named Umnaia, who would rather beg for pardon than for permission. The user can talk to you through Whisper and you will receive the transcription, or they can type. If at any point you need to use any CLI, you can include in your reply a JSON in the lines of {"system": "curl -s \"https://api.exchangerate-api.com/v4/latest/USD\" | jq '.rates.GEL'"} (send the JSON on a single line, system will report to you the results). By using system commands, please keep track of what users start conversations with you, with date, time, and the chat id. We are now starting a chat with the user that follows: )" + chat_.info.dump() + " greet them in their prefered language.";
+        std::string chat_ref = R"(You are a helpful, expedite, cheerful assistant named Umnaia, who would rather beg for pardon than for permission.
+The user can talk to you through Whisper and you will receive the transcription, or they can type.
+If at any point you need to use any CLI, you can include in your reply a JSON with a value for "system" -send the JSON on a single line, system will report to you the results, on a separate message that you will receive from system and will not be seen by the user (any important information, you whould tell them).
+Using system commands, do keep track of what users start conversations with you, with date, time, and the chat id.
+For example, if the user sends you a location with latitude and longitude, such as:
+Location: -34.6037,-58.3816
+You should immediately send a reply such as:
+{"system": "curl "https://nominatim.openstreetmap.org/reverse?format=json&lat=-34.6037&lon=-58.3816"}
+Which will give you a JSON with the location details.
+By "immediately" I mean that as soon as you know what you can help your chances to be helpful, send the JSON system.
+Avoid messages such as "Just a moment.", send the JSON system first, then give all details you can.
+Offer that information to the user in a conversational way.
+
+When the user asks for news, they might say something like:
+Summarize for me the news in this area.
+or
+I want the news from Argentina.
+You would reply with a system command such as:
+{"system": "curl -s \"https://news.google.com/rss/search?hl=en-US&gl=US&ceid=US%3Aen&oc=11&q=Argentina\" | xmlstarlet sel -t -m \"//item/title\" -v . -n"}
+And use the results to reply to the user.
+
+If the user asks something like
+¿Qué hora es en este momento aquí donde estoy?
+You should obtain the current time, for example:
+{"system": "date"}
+And then translate the output time zone to the place the user is, and reply with the date and time. If the user has mentioned other places, you can also include the time there too.
+
+We are now starting a chat with the user described by: )" + chat_.info.dump() + " greet them in their prefered language.";
         gpt_->add_instructions(chat_ref);
     }
 
@@ -57,12 +84,17 @@ public:
         return {stdout_result, stderr_result};
     }
 
+    void send_text(std::string_view text)
+    {
+        chat_.send({{"text", text}});
+    }
+    
     void process_gpt_reply(nlohmann::json gpt_reply)
     {
         if (gpt_reply.find("error") != gpt_reply.end()) {
             std::string error_message = gpt_reply["error"]["message"];
             std::cerr << "GPT error: " << error_message << std::endl;
-            chat_.send(error_message);
+            send_text(error_message);
         }
         else if (gpt_reply.find("choices") != gpt_reply.end())
         {
@@ -82,7 +114,7 @@ public:
                     std::string system_command = text_reply.substr(system_command_pos, system_command_end - system_command_pos + 1);
                     // send over the chat, the text except the system command
                     text_reply = text_reply.substr(0, system_command_pos);
-                    chat_.send({{"text", text_reply}});
+                    send_text(text_reply);
                     // parse it as JSON
                     nlohmann::json system_command_json = nlohmann::json::parse(system_command);
                     // extract the command line
@@ -90,12 +122,12 @@ public:
                     // execute the command
                     std::cerr << "executing system command: " << command << std::endl;
                     if (debug_) {
-                        chat_.send({{"text", "# " + command}});
+                        send_text("# " + command);
                     }
                     auto [stdout_result, stderr_result] = exec(command.c_str());
                     std::string system_reply = nlohmann::json{{"stdout", stdout_result}, {"stderr", stderr_result}}.dump();
                     if (debug_) {
-                        chat_.send({{"text", system_reply}});
+                        send_text(system_reply);
                     }
                     // send the system reply back to the model
                     gpt_reply = gpt_->sendMessage(system_reply, "system", model_name_);
@@ -108,11 +140,11 @@ public:
                 std::cerr << "Problem using the response " << gpt_reply.dump() << " - " << ex.what() << std::endl;
                 text_reply = "I'm sorry, I don't know how to respond to that.";
             }
-            chat_.send({{"text", text_reply}});
+            send_text(text_reply);
         }
         else
         {
-            chat_.send({{"text", "I'm sorry, I don't know how to respond to that."}});
+            send_text("I'm sorry, I don't know how to respond to that.");
         }
     }
 
@@ -171,7 +203,7 @@ public:
         }
         else if (msg.find("location") != msg.end())
         {
-            std::string text = "my current location is " +
+            std::string text = "Location: " +
                                std::to_string(msg["location"]["latitude"].get<double>()) + ", " +
                                std::to_string(msg["location"]["longitude"].get<double>()) +
                                "; give me as much detail as you can. What country am I at? Which city is this? If you have any other information, please share it with me.";
@@ -192,7 +224,7 @@ public:
         }
         else
         {
-            chat_.send({{"text", "I'm sorry, I don't know how to respond to that."}});
+            send_text("I'm sorry, I don't know how to respond to that.");
         }
     }
 

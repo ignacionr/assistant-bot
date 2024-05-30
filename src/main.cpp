@@ -39,7 +39,9 @@ int main(int argc, char *argv[])
                 std::this_thread::sleep_for(std::chrono::minutes(1));
                 auto now = std::chrono::system_clock::now();
                 auto it = std::remove_if(assistants.begin(), assistants.end(), [&now](auto &a) {
-                    return std::chrono::duration_cast<std::chrono::minutes>(now - a->last_updated()).count() > 5;
+                    auto expired = std::chrono::duration_cast<std::chrono::minutes>(now - a->last_updated()).count() > 5;
+                    if (expired) a->send_text("👋");
+                    return expired;
                 });
                 assistants.erase(it, assistants.end());
             }
