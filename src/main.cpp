@@ -2,6 +2,7 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <thread>
 #include <nlohmann/json.hpp>
 #include <cpptbot.hpp>
 #include "assistant.hpp"
@@ -32,6 +33,18 @@ int main(int argc, char *argv[])
     }
     else
     {
+        std::jthread purge_old_assistants([&assistants] {
+            while (true)
+            {
+                std::this_thread::sleep_for(std::chrono::minutes(1));
+                auto now = std::chrono::system_clock::now();
+                auto it = std::remove_if(assistants.begin(), assistants.end(), [&now](auto &a) {
+                    return std::chrono::duration_cast<std::chrono::minutes>(now - a->last_updated()).count() > 5;
+                });
+                assistants.erase(it, assistants.end());
+            }
+        });
+
         bot.poll([&assistants, &bot](auto &chat, auto chat_id)
                  {
         auto a = std::make_unique<assistant_t>(chat, [&bot](std::string const &file_id) {
