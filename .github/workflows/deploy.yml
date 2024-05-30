@@ -1,22 +1,49 @@
-- name: Set up SSH
-  run: |
-    mkdir -p ~/.ssh
-    echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
-    chmod 600 ~/.ssh/id_rsa
-    ls -la ~/.ssh
-    cat ~/.ssh/id_rsa
-  shell: /usr/bin/bash -e {0}
-  env:
-    SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+name: Build and Deploy
 
-- name: Kill existing instance on the server
-  run: ssh -o StrictHostKeyChecking=no root@bot.fastmicroservices.com 'pkill -f bot'
-  shell: /usr/bin/bash -e {0}
+on:
+  push:
+    branches:
+      - master
 
-- name: Copy binary to the server
-  run: scp -o StrictHostKeyChecking=no build/MyBotApp root@bot.fastmicroservices.com:/root/bot
-  shell: /usr/bin/bash -e {0}
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
 
-- name: Run new instance
-  run: ssh -o StrictHostKeyChecking=no root@bot.fastmicroservices.com 'nohup /root/bot > /dev/null 2>&1 &'
-  shell: /usr/bin/bash -e {0}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential gcc g++ git
+
+    - name: Build project
+      run: |
+        mkdir -p build
+        cd build
+        cmake ..
+        make
+
+    - name: Set up SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ls -la ~/.ssh
+        cat ~/.ssh/id_rsa
+      shell: /usr/bin/bash -e {0}
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    - name: Kill existing instance on the server
+      run: ssh -o StrictHostKeyChecking=no root@bot.fastmicroservices.com 'pkill -f bot'
+      shell: /usr/bin/bash -e {0}
+
+    - name: Copy binary to the server
+      run: scp -o StrictHostKeyChecking=no build/MyBotApp root@bot.fastmicroservices.com:/root/bot
+      shell: /usr/bin/bash -e {0}
+
+    - name: Run new instance
+      run: ssh -o StrictHostKeyChecking=no root@bot.fastmicroservices.com 'nohup /root/bot > /dev/null 2>&1 &'
+      shell: /usr/bin/bash -e {0}
