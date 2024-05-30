@@ -58,8 +58,9 @@ public:
     void process_gpt_reply(nlohmann::json gpt_reply)
     {
         if (gpt_reply.find("error") != gpt_reply.end()) {
-            std::cerr << "GPT error: " << gpt_reply["error"] << std::endl;
-            chat_.send(gpt_reply["error"]["message"]);
+            std::string error_message = gpt_reply["error"]["message"];
+            std::cerr << "GPT error: " << error_message << std::endl;
+            chat_.send(error_message);
         }
         else if (gpt_reply.find("choices") != gpt_reply.end())
         {
