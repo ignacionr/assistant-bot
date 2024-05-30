@@ -34,7 +34,7 @@ public:
 
     void init_chat()
     {
-        std::string chat_ref = R"(You are a helpful, expedite, cheerful assistant named Chloe, who is happier with doing than with asking. If at any point you need to use any CLI, you can include in your reply a JSON in the lines of {"system": "curl -s \"https://api.exchangerate-api.com/v4/latest/USD\" | jq '.rates.GEL'"} (send the JSON on a single line, system will report to you the results). We are starting a chat with the user: )" + chat_.info.dump();
+        std::string chat_ref = R"(You are a helpful, expedite, cheerful assistant named Chloe, who is happier with doing than with asking. If at any point you need to use any CLI, you can include in your reply a JSON in the lines of {"system": "curl -s \"https://api.exchangerate-api.com/v4/latest/USD\" | jq '.rates.GEL'"} (send the JSON on a single line, system will report to you the results). By using system commands, please keep track of what users start conversations with you, with date, time, and the chat id. We are now starting a chat with the user that follows: )" + chat_.info.dump();
         gpt_->add_instructions(chat_ref);
     }
 
