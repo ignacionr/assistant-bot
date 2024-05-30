@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <chrono>
 #include <iostream>
 #include <string>
 #include <stdexcept>
@@ -30,11 +31,12 @@ public:
         init_chat();
         chat.receive([this](msg_t msg)
                      { (*this)(msg); });
+        last_updated_ = std::chrono::system_clock::now();
     }
 
     void init_chat()
     {
-        std::string chat_ref = R"(You are a helpful, expedite, cheerful assistant named Chloe, who is happier with doing than with asking. If at any point you need to use any CLI, you can include in your reply a JSON in the lines of {"system": "curl -s \"https://api.exchangerate-api.com/v4/latest/USD\" | jq '.rates.GEL'"} (send the JSON on a single line, system will report to you the results). By using system commands, please keep track of what users start conversations with you, with date, time, and the chat id. We are now starting a chat with the user that follows: )" + chat_.info.dump();
+        std::string chat_ref = R"(You are a helpful, expedite, cheerful assistant named Chloe, who would rather beg for pardon than for permission. The user can talk to you through Whisper and you will receive the transcription, or they can type. If at any point you need to use any CLI, you can include in your reply a JSON in the lines of {"system": "curl -s \"https://api.exchangerate-api.com/v4/latest/USD\" | jq '.rates.GEL'"} (send the JSON on a single line, system will report to you the results). By using system commands, please keep track of what users start conversations with you, with date, time, and the chat id. We are now starting a chat with the user that follows: )" + chat_.info.dump();
         gpt_->add_instructions(chat_ref);
     }
 
@@ -159,7 +161,8 @@ public:
 
     void operator()(msg_t msg)
     {
-        // looks like: {"chat":{"first_name":"Игнасио","id":6885715531,"last_name":"Родригэз","type":"private"},"date":1716971494,"from":{"first_name":"Игнасио","id":6885715531,"is_bot":false,"language_code":"en","last_name":"Родригэз"},"message_id":253,"text":"Hahaha"}
+        last_updated_ = std::chrono::system_clock::now();
+        // msg looks like: {"chat":{"first_name":"Игнасио","id":6885715531,"last_name":"Родригэз","type":"private"},"date":1716971494,"from":{"first_name":"Игнасио","id":6885715531,"is_bot":false,"language_code":"en","last_name":"Родригэз"},"message_id":253,"text":"Hahaha"}
         std::cerr << "obtained: " << msg.dump() << std::endl;
         if (msg.find("text") != msg.end())
         {
@@ -193,6 +196,11 @@ public:
         }
     }
 
+    auto last_updated() const
+    {
+        return last_updated_;
+    }
+
 private:
     chat_t &chat_;
     std::unique_ptr<ignacionr::cppgpt> gpt_;
@@ -201,4 +209,5 @@ private:
     bool debug_ = false;
     std::string api_key_;
     file_contents_getter_fn get_file_content_;
+    std::chrono::time_point<std::chrono::system_clock> last_updated_;
 };
