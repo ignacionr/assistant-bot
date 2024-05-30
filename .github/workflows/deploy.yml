@@ -39,7 +39,7 @@ jobs:
         make
 
     - name: Kill existing instance on the server
-      run: ssh -o StrictHostKeyChecking=no root@bot.fastmicroservices.com 'pkill -f bot' || true
+      run: ssh -o StrictHostKeyChecking=no root@bot.fastmicroservices.com '/root/kill' || true
       shell: /usr/bin/bash -e {0}
 
     - name: Copy binary to the server
@@ -47,5 +47,5 @@ jobs:
       shell: /usr/bin/bash -e {0}
 
     - name: Run new instance
-      run: ssh -o StrictHostKeyChecking=no root@bot.fastmicroservices.com 'nohup /root/bot > /dev/null 2>&1 &'
+      run: ssh -o StrictHostKeyChecking=no root@bot.fastmicroservices.com '/root/start'
       shell: /usr/bin/bash -e {0}
