@@ -18,23 +18,25 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y cmake build-essential gcc g++ git
 
+    - name: Set up SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ls -la ~/.ssh
+        cat ~/.ssh/id_rsa
+      shell: /usr/bin/bash -e {0}
+
+    - name: Verify SSH connection
+      run: ssh -o StrictHostKeyChecking=no root@bot.fastmicroservices.com 'echo "SSH connection successful"'
+      shell: /usr/bin/bash -e {0}
+
     - name: Build project
       run: |
         mkdir -p build
         cd build
         cmake ..
         make
-
-    - name: Set up SSH
-      run: |
-        mkdir -p ~/.ssh
-        echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ls -la ~/.ssh
-        cat ~/.ssh/id_rsa
-      shell: /usr/bin/bash -e {0}
-      env:
-        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
     - name: Kill existing instance on the server
       run: ssh -o StrictHostKeyChecking=no root@bot.fastmicroservices.com 'pkill -f bot'
