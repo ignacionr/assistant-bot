@@ -1,6 +1,13 @@
 {
 	"name": "C++",
 	"image": "mcr.microsoft.com/devcontainers/cpp:1-ubuntu-24.04",
+	"runArgs": [
+		"-e", "TBOT_KEY",
+		"-e", "OPENAI_KEY"
+	],
+	"remoteEnv": {
+		"CMAKE_GENERATOR": "Ninja"
+	},
 	"customizations": {
 		"vscode": {
 			"extensions": [

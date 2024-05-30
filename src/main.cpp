@@ -32,9 +32,12 @@ int main(int argc, char *argv[])
     }
     else
     {
-        bot.poll([&assistants](auto &chat, auto chat_id)
+        bot.poll([&assistants, &bot](auto &chat, auto chat_id)
                  {
-        auto a = std::make_unique<assistant_t>(chat);
+        auto a = std::make_unique<assistant_t>(chat, [&bot](std::string const &file_id) {
+            std::cerr << "Getting file contents for file_id: " << file_id << std::endl;
+            return bot.get_file_contents(file_id);
+        });
         assistants.emplace_back(std::move(a)); });
     }
 }

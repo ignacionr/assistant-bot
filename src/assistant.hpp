@@ -5,14 +5,16 @@
 #include <stdexcept>
 #include <nlohmann/json.hpp>
 #include <cppgpt.hpp>
+#include "whisper_cli.hpp"
 
 template <typename chat_t>
 class assistant
 {
 public:
     using msg_t = nlohmann::json;
+    using file_contents_getter_fn = std::function<std::string(std::string)>;
 
-    assistant(chat_t &chat) : chat_{chat}
+    assistant(chat_t &chat, file_contents_getter_fn get_file_content) : chat_{chat}, get_file_content_{get_file_content}
     {
         // Read API key from environment variable
         const char *env_api_key = std::getenv("OPENAI_KEY");
@@ -21,10 +23,10 @@ public:
             std::cerr << "Error: OPENAI_KEY environment variable not set." << std::endl;
             throw std::runtime_error("OPENAI_KEY environment variable not set.");
         }
-        std::string api_key = env_api_key;
+        api_key_ = env_api_key;
 
         // Initialize cppgpt with the API key from the environment variable
-        gpt_ = std::make_unique<ignacionr::cppgpt>(api_key);
+        gpt_ = std::make_unique<ignacionr::cppgpt>(api_key_);
         init_chat();
         chat.receive([this](msg_t msg)
                      { (*this)(msg); });
@@ -32,7 +34,7 @@ public:
 
     void init_chat()
     {
-        std::string chat_ref = R"(You are a helpful, cheerful assistant named Chloe. If at any point you need to browse the Internet or use any CLI, you can reply with something in the lines of {"system": "curl -s \"https://api.exchangerate-api.com/v4/latest/USD\" | jq '.rates.GEL'"} (send the JSON on a single line, system will report to you the results). We are starting a chat with the user: )" + chat_.info.dump();
+        std::string chat_ref = R"(You are a helpful, expedite, cheerful assistant named Chloe, who is happier with doing than with asking. If at any point you need to use any CLI, you can include in your reply a JSON in the lines of {"system": "curl -s \"https://api.exchangerate-api.com/v4/latest/USD\" | jq '.rates.GEL'"} (send the JSON on a single line, system will report to you the results). We are starting a chat with the user: )" + chat_.info.dump();
         gpt_->add_instructions(chat_ref);
     }
 
@@ -107,7 +109,7 @@ public:
         }
         else
         {
-            chat_.send("I'm sorry, I don't know how to respond to that.");
+            chat_.send({{"text", "I'm sorry, I don't know how to respond to that."}});
         }
     }
 
@@ -171,15 +173,31 @@ public:
                                "; give me as much detail as you can. What country am I at? Which city is this? If you have any other information, please share it with me.";
             text_message(text);
         }
+        else if (msg.find("voice") != msg.end())
+        {
+            std::string mime_type = msg["voice"]["mime_type"];
+            std::string file_id = msg["voice"]["file_id"];
+            std::string contents = get_file_content_(file_id);
+            if (!whisper_)
+            {
+                whisper_ = std::make_unique<whisper_cli>(api_key_);
+            }
+            std::string text = whisper_->transcribe_audio(contents, mime_type);
+            std::cerr << "Transcribed audio: " << text << std::endl;
+            text_message(text);
+        }
         else
         {
-            chat_.send("I'm sorry, I don't know how to respond to that.");
+            chat_.send({{"text", "I'm sorry, I don't know how to respond to that."}});
         }
     }
 
 private:
     chat_t &chat_;
     std::unique_ptr<ignacionr::cppgpt> gpt_;
+    std::unique_ptr<whisper_cli> whisper_;
     std::string model_name_ = "gpt-3.5-turbo";
     bool debug_ = false;
+    std::string api_key_;
+    file_contents_getter_fn get_file_content_;
 };
