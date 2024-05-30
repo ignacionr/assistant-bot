@@ -10,14 +10,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake build-essential gcc g++ git
-
     - name: Set up SSH
       run: |
         mkdir -p ~/.ssh
@@ -31,6 +23,14 @@ jobs:
       run: ssh -o StrictHostKeyChecking=no root@bot.fastmicroservices.com 'echo "SSH connection successful"'
       shell: /usr/bin/bash -e {0}
 
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential gcc g++ git
+
     - name: Build project
       run: |
         mkdir -p build
@@ -39,7 +39,7 @@ jobs:
         make
 
     - name: Kill existing instance on the server
-      run: ssh -o StrictHostKeyChecking=no root@bot.fastmicroservices.com 'pkill -f bot'
+      run: ssh -o StrictHostKeyChecking=no root@bot.fastmicroservices.com 'pkill -f bot' || true
       shell: /usr/bin/bash -e {0}
 
     - name: Copy binary to the server
