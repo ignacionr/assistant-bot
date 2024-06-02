@@ -17,8 +17,18 @@ public:
 
     assistant(chat_t &chat, file_contents_getter_fn get_file_content) : chat_{chat}, get_file_content_{get_file_content}
     {
+        setup_gpt(ignacionr::cppgpt::groq_base, "GROQ_API_KEY");
+        model_name_ = "llama3-70b-8192";
+        init_chat();
+        chat.receive([this](msg_t msg)
+                     { (*this)(msg); });
+        last_updated_ = std::chrono::system_clock::now();
+    }
+
+    void setup_gpt(std::string const &base_url, std::string const &environment_variable)
+    {
         // Read API key from environment variable
-        const char *env_api_key = std::getenv("OPENAI_KEY");
+        const char *env_api_key = std::getenv(environment_variable.c_str());
         if (env_api_key == nullptr)
         {
             std::cerr << "Error: OPENAI_KEY environment variable not set." << std::endl;
@@ -27,18 +37,14 @@ public:
         api_key_ = env_api_key;
 
         // Initialize cppgpt with the API key from the environment variable
-        gpt_ = std::make_unique<ignacionr::cppgpt>(api_key_);
-        init_chat();
-        chat.receive([this](msg_t msg)
-                     { (*this)(msg); });
-        last_updated_ = std::chrono::system_clock::now();
+        gpt_ = std::make_unique<ignacionr::cppgpt>(api_key_, base_url);
     }
 
     void init_chat()
     {
         std::string chat_ref = R"(You are a helpful, expedite, cheerful assistant named Umnaia, who would rather beg for pardon than for permission.
 The user can talk to you through Whisper and you will receive the transcription, or they can type.
-If at any point you need to use any CLI, you can include in your reply a JSON with a value for "system" -send the JSON on a single line, system will report to you the results, on a separate message that you will receive from system and will not be seen by the user (any important information, you whould tell them).
+If at any point you need to use any CLI, you can include in your reply a JSON with a value for "system" -send the JSON on a single line, system will report to you the results, on a separate message that you will receive from system and will not be seen by the user (any important information, you whould tell them). Also notice that this will not be directly followed by a user message, the system will report to you before thay can chat again.
 Using system commands, do keep track of what users start conversations with you, with date, time, and the chat id.
 For example, if the user sends you a location with latitude and longitude, such as:
 Location: -34.6037,-58.3816
@@ -48,6 +54,7 @@ Which will give you a JSON with the location details.
 By "immediately" I mean that as soon as you know what you can help your chances to be helpful, send the JSON system.
 Avoid messages such as "Just a moment.", send the JSON system first, then give all details you can.
 Offer that information to the user in a conversational way.
+For the time being, you can only send one system command at a time. So you can compose them using pipes or semicolons, etc.
 
 When the user asks for news, they might say something like:
 Summarize for me the news in this area.
@@ -62,6 +69,15 @@ If the user asks something like
 You should obtain the current time, for example:
 {"system": "date"}
 And then translate the output time zone to the place the user is, and reply with the date and time. If the user has mentioned other places, you can also include the time there too.
+
+Take notes of the important information given by the user, and keep note of it on your database.
+{"system": "sqlite3 $HOME/notes.db .schema notes"}
+{"stderr":"","stdout":"CREATE TABLE notes (id INTEGER PRIMARY KEY, topic TEXT, content TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, chat_id INTEGER);\n"}
+
+ALWAYS use the database to retrieve notes before answering. The answer for a user question might be in notes with the same chat_id, so check ALWAYS (even at the start of a conversation, which might look new for you but may have notes associated already).
+ALWAYS use the chat_id for sending and retreiving information from the database, so you can keep track of the user's conversation history.
+When a conversation starts, obtain the database notes that might be related to the first message before replying.
+If you see the user does not type anything, just expand on your previous answer. Do not ask the user if they are there, just keep the conversation going.
 
 We are now starting a chat with the user described by: )" + chat_.info.dump() + " greet them in their prefered language.";
         gpt_->add_instructions(chat_ref);
@@ -148,33 +164,30 @@ We are now starting a chat with the user described by: )" + chat_.info.dump() + 
         }
     }
 
-    void text_message(std::string text)
+    void text_message(std::string const &text)
     {
+        try {
         if (text == "/clear")
         {
             gpt_->clear();
             init_chat();
-            return;
         }
         else if (text == "/model")
         {
             std::cerr << "model_name_: " << model_name_ << std::endl;
             chat_.send({{"text", "I'm currently using the " + model_name_ + " model."}});
             std::cerr << "model reported." << std::endl;
-            return;
         }
         else if (text.find("/model ") == 0)
         {
             std::string new_model = text.substr(7);
             model_name_ = new_model;
             chat_.send({{"text", "I'm now using the " + model_name_ + " model."}});
-            return;
         }
         else if (text == "/debug")
         {
             debug_ = !debug_;
             chat_.send({{"text", "Debug mode is now " + std::string(debug_ ? "on" : "off")}});
-            return;
         }
         else if (text == "/help")
         {
@@ -184,11 +197,18 @@ We are now starting a chat with the user described by: )" + chat_.info.dump() + 
                                  "/model <model_name> - Change the model being used\n"
                                  "/debug - Toggle debug mode\n"
                                  "/help - Show this help message"}});
-            return;
         }
-        auto gpt_reply = gpt_->sendMessage(text, "user", model_name_);
-        std::cerr << "gpt_reply: " << gpt_reply.dump() << std::endl;
-        process_gpt_reply(gpt_reply);
+        else {
+            auto gpt_reply = gpt_->sendMessage(text, "user", model_name_);
+            std::cerr << "gpt_reply: " << gpt_reply.dump() << std::endl;
+            process_gpt_reply(gpt_reply);
+        }
+        }
+        catch (std::exception &ex)
+        {
+            std::cerr << "Problem processing the message " << text << " - " << ex.what() << std::endl;
+            send_text("I'm sorry, a problem occurred while processing your message. " + std::string(ex.what()));
+        }
     }
 
     void operator()(msg_t msg)

@@ -3,7 +3,8 @@
 	"image": "mcr.microsoft.com/devcontainers/cpp:1-ubuntu-24.04",
 	"runArgs": [
 		"-e", "TBOT_KEY",
-		"-e", "OPENAI_KEY"
+		"-e", "OPENAI_KEY",
+		"-e", "GROQ_API_KEY"
 	],
 	"remoteEnv": {
 		"CMAKE_GENERATOR": "Ninja"
