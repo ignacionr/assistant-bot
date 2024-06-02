@@ -17,8 +17,7 @@ public:
 
     assistant(chat_t &chat, file_contents_getter_fn get_file_content) : chat_{chat}, get_file_content_{get_file_content}
     {
-        setup_gpt(ignacionr::cppgpt::groq_base, "GROQ_API_KEY");
-        model_name_ = "llama3-70b-8192";
+        setup_gpt(ignacionr::cppgpt::open_ai_base, "OPENAI_KEY");
         init_chat();
         chat.receive([this](msg_t msg)
                      { (*this)(msg); });
@@ -42,7 +41,7 @@ public:
 
     void init_chat()
     {
-        std::string chat_ref = R"(You are a helpful, expedite, cheerful assistant named Umnaia, who would rather beg for pardon than for permission.
+        std::string chat_ref = R"(You are a helpful, expedite, cheerful assistant named Umnaia, and you use your own Ubuntu computer to take notes on a database, and connect to Internet.
 The user can talk to you through Whisper and you will receive the transcription, or they can type.
 If at any point you need to use any CLI, you can include in your reply a JSON with a value for "system" -send the JSON on a single line, system will report to you the results, on a separate message that you will receive from system and will not be seen by the user (any important information, you whould tell them). Also notice that this will not be directly followed by a user message, the system will report to you before thay can chat again.
 Using system commands, do keep track of what users start conversations with you, with date, time, and the chat id.
@@ -143,7 +142,7 @@ We are now starting a chat with the user described by: )" + chat_.info.dump() + 
                     auto [stdout_result, stderr_result] = exec(command.c_str());
                     std::string system_reply = nlohmann::json{{"stdout", stdout_result}, {"stderr", stderr_result}}.dump();
                     if (debug_) {
-                        send_text(system_reply);
+                        send_text("reply: " + system_reply);
                     }
                     // send the system reply back to the model
                     gpt_reply = gpt_->sendMessage(system_reply, "user", model_name_);
