@@ -146,7 +146,7 @@ We are now starting a chat with the user described by: )" + chat_.info.dump() + 
                         send_text(system_reply);
                     }
                     // send the system reply back to the model
-                    gpt_reply = gpt_->sendMessage(system_reply, "system", model_name_);
+                    gpt_reply = gpt_->sendMessage(system_reply, "user", model_name_);
                     process_gpt_reply(gpt_reply);
                     return;
                 }
