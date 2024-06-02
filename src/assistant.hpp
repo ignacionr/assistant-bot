@@ -236,7 +236,13 @@ We are now starting a chat with the user described by: )" + chat_.info.dump() + 
             std::string contents = get_file_content_(file_id);
             if (!whisper_)
             {
-                whisper_ = std::make_unique<whisper_cli>(api_key_);
+                const char *env_api_key = std::getenv("OPENAI_KEY");
+                if (env_api_key == nullptr)
+                {
+                    std::cerr << "Error: OPENAI_KEY environment variable not set." << std::endl;
+                    throw std::runtime_error("OPENAI_KEY environment variable not set.");
+                }
+                whisper_ = std::make_unique<whisper_cli>(env_api_key);
             }
             std::string text = whisper_->transcribe_audio(contents, mime_type);
             std::cerr << "Transcribed audio: " << text << std::endl;
