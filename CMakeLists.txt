@@ -47,4 +47,4 @@ target_include_directories(MyBotApp PRIVATE
   ${CMAKE_BINARY_DIR}/_deps/cppgpt-src/include
 )
 
-target_link_libraries(MyBotApp PRIVATE cpr::cpr nlohmann_json::nlohmann_json)
+target_link_libraries(MyBotApp PRIVATE cpr::cpr nlohmann_json::nlohmann_json sqlite3)
