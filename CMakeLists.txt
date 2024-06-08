@@ -29,7 +29,7 @@ FetchContent_Declare(
 # Make cppTBot available
 FetchContent_MakeAvailable(cppTBot)
 
-# now fetch https://github.com/ignacionr/cppgpt
+# Fetch cppgpt
 FetchContent_Declare(
   cppgpt
   GIT_REPOSITORY https://github.com/ignacionr/cppgpt.git
@@ -38,13 +38,39 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(cppgpt)
 
-# Add your executable
+# Fetch Google Test
+FetchContent_Declare(
+  googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG release-1.12.1  # This is an example tag; you can select the appropriate version
+)
+FetchContent_MakeAvailable(googletest)
+
+# Enable testing in CMake
+enable_testing()
+
+# Add your application's executable
 add_executable(MyBotApp src/main.cpp)
 
-# Specify the include directory for nlohmann_json
-target_include_directories(MyBotApp PRIVATE 
+# Specify the include directory
+include_directories( 
   ${CMAKE_BINARY_DIR}/_deps/cpptbot-src/include
   ${CMAKE_BINARY_DIR}/_deps/cppgpt-src/include
 )
 
-target_link_libraries(MyBotApp PRIVATE cpr::cpr nlohmann_json::nlohmann_json)
+target_link_libraries(MyBotApp PRIVATE cpr::cpr nlohmann_json::nlohmann_json sqlite3)
+
+# Add the test executable
+add_executable(test_section_parsing tests/section-parsing.cpp)
+
+# Link the test executable with GoogleTest and any other required libraries
+target_link_libraries(test_section_parsing PRIVATE 
+  gtest_main 
+  gmock_main 
+  nlohmann_json::nlohmann_json
+  cpr::cpr
+  )
+
+# Add the test to CTest so it can be run with `make test` or `ctest`
+include(GoogleTest)
+gtest_discover_tests(test_section_parsing)

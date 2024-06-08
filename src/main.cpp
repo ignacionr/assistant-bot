@@ -5,10 +5,12 @@
 #include <thread>
 #include <nlohmann/json.hpp>
 #include <cpptbot.hpp>
+#include "chatdb.hpp"
 #include "assistant.hpp"
 
 int main(int argc, char *argv[])
 {
+    chat_db db{"notes.db"};
     // Read API key from environment variable
     const char *env_api_key = std::getenv("TBOT_KEY");
     if (env_api_key == nullptr)
@@ -16,7 +18,7 @@ int main(int argc, char *argv[])
         std::cerr << "Error: TBOT_SAMPLE_KEY environment variable not set." << std::endl;
         return 1;
     }
-    using assistant_t = assistant<ignacionr::chat<nlohmann::json>>;
+    using assistant_t = assistant<ignacionr::chat<nlohmann::json>, uint64_t, chat_db>;
     std::vector<std::unique_ptr<assistant_t>> assistants;
     ignacionr::cpptbot bot{env_api_key};
 
@@ -47,12 +49,13 @@ int main(int argc, char *argv[])
             }
         });
 
-        bot.poll([&assistants, &bot](auto &chat, auto chat_id)
-                 {
-        auto a = std::make_unique<assistant_t>(chat, [&bot](std::string const &file_id) {
-            std::cerr << "Getting file contents for file_id: " << file_id << std::endl;
-            return bot.get_file_contents(file_id);
+        bot.poll([&assistants, &db, &bot](auto &chat, auto chat_id)
+        {
+            auto a = std::make_unique<assistant_t>(chat, chat_id, db, [&bot](std::string const &file_id) {
+                std::cerr << "Getting file contents for file_id: " << file_id << std::endl;
+                return bot.get_file_contents(file_id);
+            });
+            assistants.emplace_back(std::move(a)); 
         });
-        assistants.emplace_back(std::move(a)); });
     }
 }
