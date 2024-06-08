@@ -6,6 +6,7 @@
 #include <iostream>
 #include <string>
 #include <stdexcept>
+#include <thread>
 #include <regex>
 #include <nlohmann/json.hpp>
 #include <cppgpt.hpp>
@@ -66,7 +67,9 @@ public:
 
   void send_text(std::string_view text)
   {
+    std::lock_guard<std::mutex> lock(conversation_mutex);
     chat_.send({{"text", text}});
+    conversation.push_back({"assistant", std::string{text}});
   }
 
   std::string execute_scripts(std::string const &text, context_t &context)
@@ -205,6 +208,14 @@ public:
       else
       {
         auto context = db_.get_latest_notes(chat_id_, 5);
+        // add the current conversation to the context
+        {
+          std::lock_guard<std::mutex> lock(conversation_mutex);
+          for (auto &note : conversation)
+          {
+            context.push_back(note);
+          }
+        }
         auto classification = classify(text, context);
         auto recall_response = recall_augment(classification, context);
         if (debug_) {
@@ -226,6 +237,10 @@ public:
         }
         auto reply = responder.sendMessage(text, "user", "gpt-3.5-turbo");
         auto response = reply["choices"][0]["message"]["content"].template get<std::string>();
+        {
+          std::lock_guard<std::mutex> lock(conversation_mutex);
+          conversation.push_back({"user", text});
+        }
         send_text(response);
       }
     }
@@ -349,4 +364,7 @@ private:
   std::string api_key_;
   file_contents_getter_fn get_file_content_;
   std::chrono::time_point<std::chrono::system_clock> last_updated_;
+  context_t conversation;
+  // a mutex to protect the conversation context
+  std::mutex conversation_mutex;
 };
