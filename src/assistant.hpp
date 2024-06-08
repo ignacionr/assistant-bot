@@ -179,7 +179,15 @@ public:
     return recall_augmented;
   }
 
-  void text_message(std::string const &text)
+  void text_message(std::string const &text) {
+    std::thread t([this, text] {
+      text_message_execute(text);
+    });
+    t.detach();
+  }
+
+
+  void text_message_execute(std::string const &text)
   {
     try
     {
