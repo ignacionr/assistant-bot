@@ -61,6 +61,25 @@ public:
         return notes;
     }
 
+    std::vector<std::pair<std::string,std::string>> search_notes(uint64_t chat_id, std::string const &keyword) {
+        std::vector<std::pair<std::string,std::string>> notes;
+        sqlite3_stmt *stmt;
+        // Modify the query to use '%' wildcards around the keyword
+        std::string keyword_pattern = "%" + keyword + "%";
+        sqlite3_prepare_v2(db, "SELECT topic, content FROM notes WHERE chat_id = ? AND (topic LIKE ? OR content LIKE ?);", -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, chat_id);
+        sqlite3_bind_text(stmt, 2, keyword_pattern.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 3, keyword_pattern.c_str(), -1, SQLITE_STATIC);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            notes.push_back({
+                std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)), sqlite3_column_bytes(stmt, 0)),
+                std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)), sqlite3_column_bytes(stmt, 1))
+            });
+        }
+        sqlite3_finalize(stmt);
+        return notes;
+    }
+
 private:
     sqlite3 *db;
 

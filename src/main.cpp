@@ -5,8 +5,8 @@
 #include <thread>
 #include <nlohmann/json.hpp>
 #include <cpptbot.hpp>
-#include "assistant.hpp"
 #include "chatdb.hpp"
+#include "assistant.hpp"
 
 int main(int argc, char *argv[])
 {
