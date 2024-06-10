@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
     const char *env_api_key = std::getenv("TBOT_KEY");
     if (env_api_key == nullptr)
     {
-        std::cerr << "Error: TBOT_SAMPLE_KEY environment variable not set." << std::endl;
+        std::cerr << "Error: TBOT_KEY environment variable not set." << std::endl;
         return 1;
     }
     using assistant_t = assistant<ignacionr::chat<nlohmann::json>, uint64_t, chat_db>;

@@ -15,6 +15,7 @@
 #include "system-recall.hpp"
 #include "system-executor.hpp"
 #include "system-responder.hpp"
+#include "system-summary.hpp"
 
 using namespace std::string_literals;
 
@@ -75,7 +76,14 @@ public:
   std::string execute_scripts(std::string const &text, context_t &context)
   {
     auto executor = setup_gpt(ignacionr::cppgpt::open_ai_base, "OPENAI_KEY");
-    executor.add_instructions(system_executor, "system");
+    std::string executor_instructions = system_executor;
+    // add the context to the executor instructions
+    executor_instructions += "\n\nContext Information:\n";
+    for (auto &note : context)
+    {
+      executor_instructions += note.second + ": " + note.first + "\n";
+    }
+    executor.add_instructions(executor_instructions, "system");
     for (auto &note : context)
     {
       executor.add_instructions(note.first + ": " + note.second, "user");
@@ -87,19 +95,37 @@ public:
       chat_.send({{"text", "I have executed the following scripts: "s + response}});
     }
     // in the response, find the scripts to execute
-    std::regex script_regex(R"(Script to Execute: (.+))");
+    // std::regex script_regex(R"(\s*-?\s*`?(.+)`?)");
+    // std::regex script_regex(R"((```(?:bash)?\s*([^`]+)```|`([^`]+)`|([^`\s].*)))");
+    // std::regex script_regex(R"((```(?:bash)?\s*([^`]+?)```|---begin quote\s*`([^`]+?)`\s*---end quote|`([^`]+?)`|([^`\s].*)))");
+    std::regex script_regex(R"((```(?:bash)?\s*([^`]+)```|`([^`]+)`|\s*(.*)))");
     std::smatch script_match;
     if (std::regex_search(response, script_match, script_regex))
     {
-      auto script_source = script_match[1].str();
-      auto [stdout_result, stderr_result] = exec(script_source.c_str());
-      if (debug_)
+      std::string script_source = 
+        script_match[2].matched ? script_match[2].str() :
+        script_match[3].matched ? script_match[3].str() :
+        script_match[4].matched ? script_match[4].str() :
+        std::string{};
+      if (!script_source.empty())
       {
-        chat_.send({{"text", "I have executed the script and obtained the following result: "s + stdout_result}});
+        if (debug_)
+        {
+          chat_.send({{"text", "I have found the following script to execute: "s + script_source}});
+        }
+        auto [stdout_result, stderr_result] = exec(script_source.c_str());
+        if (debug_)
+        {
+          chat_.send({{"text", "I have executed the script and obtained the following result: stdout: "s + stdout_result + " stderr: " + stderr_result}});
+        }
+        context.push_back({"script", script_source});
+        context.push_back({"script_result_stdout", stdout_result});
+        context.push_back({"script_result_stderr", stderr_result});
       }
-      context.push_back({"script", script_source});
-      context.push_back({"script_result_stdout", stdout_result});
-      context.push_back({"script_result_stderr", stderr_result});
+    }
+    else if (debug_)
+    {
+      chat_.send({{"text", "I have not found any scripts to execute."}});
     }
     return response;
   }
@@ -182,13 +208,29 @@ public:
     return recall_augmented;
   }
 
+  std::string summarize(std::string const &text, context_t const &context) {
+    ignacionr::cppgpt summarizer = setup_gpt(ignacionr::cppgpt::open_ai_base, "OPENAI_KEY");
+    std::string summary_request = system_summary;
+
+    // add context to the summary_request
+    for (const auto& note : context) {
+      summary_request += note.second + ": " + note.first + "\n";
+    }
+    summarizer.add_instructions(summary_request, "system");
+    auto reply = summarizer.sendMessage(text, "user", "gpt-3.5-turbo");
+    std::string summary = reply["choices"][0]["message"]["content"].template get<std::string>();
+    if (debug_) {
+      chat_.send({{"text", "Here is the summary: "s + summary}});
+    }
+    return summary;
+  }
+
   void text_message(std::string const &text) {
     std::thread t([this, text] {
       text_message_execute(text);
     });
     t.detach();
   }
-
 
   void text_message_execute(std::string const &text)
   {
@@ -229,12 +271,13 @@ public:
         }
         context.push_back({"classification", classification});
         auto executor_response = execute_scripts(text, context);
+        auto summary = summarize(text, context);
         auto responder = setup_gpt(ignacionr::cppgpt::open_ai_base, "OPENAI_KEY");
-        responder.add_instructions(system_responder, "system");
-        for (auto &note : context)
-        {
-          responder.add_instructions(note.first + ": " + note.second, "assistant");
-        }
+        std::string responder_instructions = system_responder;
+        responder_instructions += "\n\nContext Information:\n";
+        responder_instructions += summary;
+        
+        responder.add_instructions(responder_instructions, "system");
         auto reply = responder.sendMessage(text, "user", "gpt-3.5-turbo");
         auto response = reply["choices"][0]["message"]["content"].template get<std::string>();
         {

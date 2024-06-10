@@ -1,6 +1,6 @@
 #pragma once
 
-auto constexpr system_classifier =             R"(### System Instruction for Classifier GPT
+auto constexpr system_classifier = R"(### System Instruction for Classifier GPT
 
 **Role Description:**
 
@@ -177,6 +177,5 @@ Relevant Facts:
   Content: User started programming at 8 years old, has been working in C++ since 1994
 - Topic: Personal Information
   Content: User was born in 1974
-
 
 )";
