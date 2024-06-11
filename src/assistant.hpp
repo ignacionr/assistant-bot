@@ -73,7 +73,7 @@ public:
     conversation.push_back({"assistant", std::string{text}});
   }
 
-  std::string execute_scripts(std::string const &text, context_t &context)
+  void execute_scripts(std::string const &text, context_t &context)
   {
     auto executor = setup_gpt(ignacionr::cppgpt::open_ai_base, "OPENAI_KEY");
     std::string executor_instructions = system_executor;
@@ -127,7 +127,6 @@ public:
     {
       chat_.send({{"text", "I have not found any scripts to execute."}});
     }
-    return response;
   }
 
   std::string classify(std::string const &text, context_t &context)
@@ -270,13 +269,22 @@ public:
           chat_.send({{"text", context_text}});
         }
         context.push_back({"classification", classification});
-        auto executor_response = execute_scripts(text, context);
+        execute_scripts(text, context);
         auto summary = summarize(text, context);
         auto responder = setup_gpt(ignacionr::cppgpt::open_ai_base, "OPENAI_KEY");
         std::string responder_instructions = system_responder;
         responder_instructions += "\n\nContext Information:\n";
         responder_instructions += summary;
-        
+        responder_instructions += "\n\n";
+
+        // append the 3 most recent context items, in their insertion order
+        // start from the end minus three items
+        auto start = context.size() > 3 ? context.end() - 3 : context.begin();
+        for (auto it = start; it != context.end(); ++it)
+        {
+          responder_instructions += it->second + ": " + it->first + "\n";
+        }
+
         responder.add_instructions(responder_instructions, "system");
         auto reply = responder.sendMessage(text, "user", "gpt-3.5-turbo");
         auto response = reply["choices"][0]["message"]["content"].template get<std::string>();
